@@ -1,0 +1,71 @@
+[package]
+name = "ghoststream"
+version = "0.1.0"
+edition = "2021"
+description = "NVIDIA GPU Video Engine - Capture, Encode, Stream"
+authors = ["Christopher 'GhostKellz' Kelley"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/ghostkellz/ghoststream"
+keywords = ["nvenc", "video", "encoding", "streaming", "nvidia"]
+categories = ["multimedia::video", "hardware-support"]
+
+[lib]
+name = "ghoststream"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ghoststream"
+path = "src/main.rs"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.41", features = ["full", "signal", "sync"] }
+async-trait = "0.1"
+futures = "0.3"
+
+# Screen capture via portal
+ashpd = { version = "0.10", features = ["tokio"] }
+
+# PipeWire for video streams
+pipewire = "0.8"
+libspa = "0.8"
+libspa-sys = "0.8"
+
+# Video encoding (FFmpeg with NVENC)
+ffmpeg-next = "8.0"
+
+# Error handling
+thiserror = "2.0"
+anyhow = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
+
+# CLI
+clap = { version = "4.5", features = ["derive"] }
+
+# Utilities
+parking_lot = "0.12"
+crossbeam-channel = "0.5"
+
+[dev-dependencies]
+criterion = "0.5"
+tempfile = "3.10"
+
+[features]
+default = []
+# Full feature set
+full = []
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+
+[profile.dev]
+opt-level = 1

@@ -1,7 +1,39 @@
-.zig-cache/
-zig-out/
-*.o
-*.exe
+# Rust build artifacts
+target/
+Cargo.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Development docs (generated)
 CLAUDE.md
 TODO.md
 DEVELOPMENT_ROADMAP.md
+
+# Environment
+.env
+.env.local
+
+# Debug/profiling
+*.pdb
+perf.data
+perf.data.old
+flamegraph.svg
+
+# FFmpeg/NVENC test outputs
+*.mkv
+*.mp4
+*.webm
+*.h264
+*.hevc
+*.av1
+
+archive/ 
