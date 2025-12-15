@@ -3,11 +3,13 @@
 //! Provides screen capture via:
 //! - xdg-desktop-portal (recommended for Wayland)
 //! - PipeWire direct capture
-//! - wlroots DMA-BUF export
+//! - DMA-BUF zero-copy (wlroots, KDE, GNOME)
 
+mod dmabuf;
 mod portal;
 mod stream;
 
+pub use dmabuf::{DmaBufCapture, DmaBufFrame, DmaBufInfo, DmaBufImporter};
 pub use portal::PortalCapture;
 pub use stream::CaptureStream;
 
@@ -40,7 +42,7 @@ pub trait Capture: Send + Sync {
 /// Create a capture source based on configuration
 pub async fn create_capture(config: CaptureConfig) -> Result<Box<dyn Capture>> {
     let backend = if config.backend == CaptureBackend::Auto {
-        detect_best_backend()
+        detect_best_backend(&config)
     } else {
         config.backend
     };
@@ -57,25 +59,37 @@ pub async fn create_capture(config: CaptureConfig) -> Result<Box<dyn Capture>> {
             Ok(Box::new(capture))
         }
         CaptureBackend::WlrExport => {
-            // TODO: Implement wlroots DMA-BUF export
-            let capture = PortalCapture::new(config).await?;
-            Ok(Box::new(capture))
+            // Use DMA-BUF zero-copy capture
+            if DmaBufCapture::is_available() {
+                tracing::info!("Using DMA-BUF zero-copy capture");
+                let capture = DmaBufCapture::new(config)?;
+                Ok(Box::new(capture))
+            } else {
+                tracing::warn!("DMA-BUF not available, falling back to portal capture");
+                let capture = PortalCapture::new(config).await?;
+                Ok(Box::new(capture))
+            }
         }
     }
 }
 
 /// Detect the best capture backend for this system
-fn detect_best_backend() -> CaptureBackend {
+fn detect_best_backend(config: &CaptureConfig) -> CaptureBackend {
     // Check for Wayland
-    if std::env::var("WAYLAND_DISPLAY").is_ok() {
-        return CaptureBackend::Portal;
+    let is_wayland = std::env::var("WAYLAND_DISPLAY").is_ok()
+        || std::env::var("XDG_SESSION_TYPE")
+            .map(|s| s == "wayland")
+            .unwrap_or(false);
+
+    // If DMA-BUF is preferred and available, use it
+    if config.prefer_dmabuf && is_wayland && DmaBufCapture::is_available() {
+        tracing::info!("Auto-selecting DMA-BUF capture (zero-copy)");
+        return CaptureBackend::WlrExport;
     }
 
-    // Check XDG session type
-    if let Ok(session) = std::env::var("XDG_SESSION_TYPE") {
-        if session == "wayland" {
-            return CaptureBackend::Portal;
-        }
+    // Default to portal for Wayland
+    if is_wayland {
+        return CaptureBackend::Portal;
     }
 
     // Default to portal (works on X11 too via xdg-desktop-portal-gtk)

@@ -1,6 +1,7 @@
 //! Configuration types for GhostStream
 
 use crate::encode::Codec;
+use crate::processing::HdrConfig;
 use crate::types::{FrameFormat, Framerate, Resolution};
 use serde::{Deserialize, Serialize};
 
@@ -63,12 +64,14 @@ pub enum CaptureBackend {
 }
 
 /// Encoder configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct EncoderConfig {
     /// Video codec
     pub codec: Codec,
     /// Output resolution (None = same as input)
     pub resolution: Option<Resolution>,
+    /// Target framerate
+    pub framerate: Framerate,
     /// Target bitrate in kbps
     pub bitrate_kbps: u32,
     /// Maximum bitrate in kbps (for VBR)
@@ -91,6 +94,8 @@ pub struct EncoderConfig {
     pub profile: Option<String>,
     /// Level (codec-specific)
     pub level: Option<String>,
+    /// HDR configuration (None for SDR)
+    pub hdr: Option<HdrConfig>,
 }
 
 impl Default for EncoderConfig {
@@ -98,6 +103,7 @@ impl Default for EncoderConfig {
         Self {
             codec: Codec::H264,
             resolution: None,
+            framerate: Framerate::FPS_60,
             bitrate_kbps: 6000,
             max_bitrate_kbps: None,
             rate_control: RateControl::Vbr,
@@ -109,6 +115,7 @@ impl Default for EncoderConfig {
             pixel_format: FrameFormat::Nv12,
             profile: None,
             level: None,
+            hdr: None, // SDR by default
         }
     }
 }
@@ -126,6 +133,11 @@ impl EncoderConfig {
 
     pub fn with_bitrate_kbps(mut self, bitrate: u32) -> Self {
         self.bitrate_kbps = bitrate;
+        self
+    }
+
+    pub fn with_framerate(mut self, fps: u32) -> Self {
+        self.framerate = Framerate::new(fps, 1);
         self
     }
 
@@ -147,6 +159,34 @@ impl EncoderConfig {
     pub fn with_tuning(mut self, tuning: EncoderTuning) -> Self {
         self.tuning = tuning;
         self
+    }
+
+    /// Enable HDR10 encoding
+    pub fn with_hdr10(mut self) -> Self {
+        self.hdr = Some(HdrConfig::hdr10());
+        self.pixel_format = FrameFormat::P010;
+        self
+    }
+
+    /// Enable HDR with custom config
+    pub fn with_hdr(mut self, hdr_config: HdrConfig) -> Self {
+        if hdr_config.bit_depth >= 10 {
+            self.pixel_format = FrameFormat::P010;
+        }
+        self.hdr = Some(hdr_config);
+        self
+    }
+
+    /// Enable HLG HDR encoding
+    pub fn with_hlg(mut self) -> Self {
+        self.hdr = Some(HdrConfig::hlg());
+        self.pixel_format = FrameFormat::P010;
+        self
+    }
+
+    /// Check if HDR is enabled
+    pub fn is_hdr(&self) -> bool {
+        self.hdr.as_ref().map(|h| h.is_hdr()).unwrap_or(false)
     }
 
     /// Apply a preset configuration
@@ -242,6 +282,10 @@ pub enum Preset {
     LowLatency,
     /// Recording (high quality, large files)
     Recording,
+    /// HDR10 4K60 (10-bit P010)
+    Hdr10_4K60,
+    /// HDR10 1440p60 (10-bit P010)
+    Hdr10_1440p60,
 }
 
 impl From<Preset> for EncoderConfig {
@@ -250,6 +294,7 @@ impl From<Preset> for EncoderConfig {
             Preset::Discord720p => EncoderConfig {
                 codec: Codec::H264,
                 resolution: Some(Resolution::HD_720P),
+                framerate: Framerate::FPS_30,
                 bitrate_kbps: 3000,
                 preset: EncoderPreset::Fast,
                 tuning: EncoderTuning::LowLatency,
@@ -259,6 +304,7 @@ impl From<Preset> for EncoderConfig {
             Preset::Stream1080p60 => EncoderConfig {
                 codec: Codec::H264,
                 resolution: Some(Resolution::FHD_1080P),
+                framerate: Framerate::FPS_60,
                 bitrate_kbps: 6000,
                 preset: EncoderPreset::Medium,
                 tuning: EncoderTuning::HighQuality,
@@ -268,6 +314,7 @@ impl From<Preset> for EncoderConfig {
             Preset::Quality1440p60 => EncoderConfig {
                 codec: Codec::Hevc,
                 resolution: Some(Resolution::QHD_1440P),
+                framerate: Framerate::FPS_60,
                 bitrate_kbps: 12000,
                 preset: EncoderPreset::Slow,
                 tuning: EncoderTuning::HighQuality,
@@ -277,6 +324,7 @@ impl From<Preset> for EncoderConfig {
             Preset::Gaming1440p120 => EncoderConfig {
                 codec: Codec::Hevc,
                 resolution: Some(Resolution::QHD_1440P),
+                framerate: Framerate::FPS_120,
                 bitrate_kbps: 15000,
                 preset: EncoderPreset::Fast,
                 tuning: EncoderTuning::LowLatency,
@@ -286,6 +334,7 @@ impl From<Preset> for EncoderConfig {
             Preset::Ultra4K60 => EncoderConfig {
                 codec: Codec::Av1,
                 resolution: Some(Resolution::UHD_4K),
+                framerate: Framerate::FPS_60,
                 bitrate_kbps: 25000,
                 preset: EncoderPreset::Slow,
                 tuning: EncoderTuning::HighQuality,
@@ -295,6 +344,7 @@ impl From<Preset> for EncoderConfig {
             Preset::Maximum4K120 => EncoderConfig {
                 codec: Codec::Av1,
                 resolution: Some(Resolution::UHD_4K),
+                framerate: Framerate::FPS_120,
                 bitrate_kbps: 35000,
                 preset: EncoderPreset::Medium,
                 tuning: EncoderTuning::HighQuality,
@@ -304,6 +354,7 @@ impl From<Preset> for EncoderConfig {
             Preset::LowLatency => EncoderConfig {
                 codec: Codec::H264,
                 resolution: None,
+                framerate: Framerate::FPS_60,
                 bitrate_kbps: 8000,
                 preset: EncoderPreset::Fastest,
                 tuning: EncoderTuning::UltraLowLatency,
@@ -314,12 +365,39 @@ impl From<Preset> for EncoderConfig {
             Preset::Recording => EncoderConfig {
                 codec: Codec::Hevc,
                 resolution: None,
+                framerate: Framerate::FPS_60,
                 bitrate_kbps: 50000,
                 preset: EncoderPreset::Slowest,
                 tuning: EncoderTuning::HighQuality,
                 gop_size: 300,
                 b_frames: 3,
                 lookahead: Some(20),
+                ..Default::default()
+            },
+            Preset::Hdr10_4K60 => EncoderConfig {
+                codec: Codec::Hevc,
+                resolution: Some(Resolution::UHD_4K),
+                framerate: Framerate::FPS_60,
+                bitrate_kbps: 35000,
+                preset: EncoderPreset::Slow,
+                tuning: EncoderTuning::HighQuality,
+                gop_size: 120,
+                pixel_format: FrameFormat::P010,
+                hdr: Some(HdrConfig::hdr10()),
+                profile: Some("main10".to_string()),
+                ..Default::default()
+            },
+            Preset::Hdr10_1440p60 => EncoderConfig {
+                codec: Codec::Hevc,
+                resolution: Some(Resolution::QHD_1440P),
+                framerate: Framerate::FPS_60,
+                bitrate_kbps: 20000,
+                preset: EncoderPreset::Slow,
+                tuning: EncoderTuning::HighQuality,
+                gop_size: 120,
+                pixel_format: FrameFormat::P010,
+                hdr: Some(HdrConfig::hdr10()),
+                profile: Some("main10".to_string()),
                 ..Default::default()
             },
         }

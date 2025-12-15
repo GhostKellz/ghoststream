@@ -5,13 +5,19 @@
 <h1 align="center">GhostStream</h1>
 
 <p align="center">
-  <strong>NVIDIA GPU Video Engine for Rust</strong><br>
+  <strong>Multi-Platform GPU Video Engine for Rust</strong><br>
   <em>High-performance video capture, encoding, and streaming</em>
 </p>
 
 <p align="center">
   <!-- Hardware Encoding -->
   <img src="https://img.shields.io/badge/NVENC-76B900?style=for-the-badge&logo=nvidia&logoColor=white" alt="NVENC"/>
+  <img src="https://img.shields.io/badge/QSV-0071C5?style=for-the-badge&logo=intel&logoColor=white" alt="Intel QSV"/>
+  <img src="https://img.shields.io/badge/AMF-ED1C24?style=for-the-badge&logo=amd&logoColor=white" alt="AMD AMF"/>
+</p>
+
+<p align="center">
+  <!-- Codecs -->
   <img src="https://img.shields.io/badge/H.264-FF6B6B?style=for-the-badge&logo=videolan&logoColor=white" alt="H.264"/>
   <img src="https://img.shields.io/badge/H.265%2FHEVC-4ECDC4?style=for-the-badge&logo=videolan&logoColor=white" alt="H.265"/>
   <img src="https://img.shields.io/badge/AV1-FFE66D?style=for-the-badge&logo=aom&logoColor=black" alt="AV1"/>
@@ -56,17 +62,19 @@
 
 ## Overview
 
-GhostStream is a first-class Rust library for NVIDIA hardware video encoding, designed for game streaming, screen capture, and real-time video processing. It provides a unified API for both GPU-accelerated (NVENC) and CPU-based encoding with automatic backend selection.
+GhostStream is a first-class Rust library for hardware video encoding, designed for game streaming, screen capture, and real-time video processing. It provides a unified API for GPU-accelerated encoding across NVIDIA (NVENC), Intel (QSV), AMD (AMF), and CPU-based encoders with automatic backend selection.
 
 ### Key Features
 
-- **NVENC Hardware Encoding** - H.264, HEVC (H.265), and AV1 via NVIDIA GPUs
+- **Multi-GPU Hardware Encoding** - NVIDIA NVENC, Intel QSV, AMD AMF support
+- **All Major Codecs** - H.264, HEVC (H.265), and AV1 across all backends
 - **Software Encoding** - x264, x265, and SVT-AV1 optimized for AMD Zen3D/Zen5
 - **Wayland Screen Capture** - Secure portal-based capture (KDE, GNOME, Hyprland)
-- **PipeWire Integration** - Virtual camera output for Discord, OBS, and more
+- **PipeWire Integration** - Audio capture and virtual camera output
+- **Streaming Output** - RTMP (Twitch/YouTube) and SRT (low-latency)
 - **File Recording** - MKV, MP4, WebM, and TS container support
-- **Auto Backend Selection** - Automatically chooses NVENC or CPU encoding
-- **Low Latency** - Sub-2ms encoding latency with NVENC
+- **Auto Backend Selection** - Automatically chooses best available encoder
+- **Low Latency** - Sub-2ms encoding latency with hardware encoders
 
 ## Performance
 
@@ -238,6 +246,8 @@ let encoder = create_encoder_with_backend(config, EncoderBackend::Nvenc)?;
 | `max` | 4K | 120 | AV1 | 35 Mbps | Maximum (RTX 40/50) |
 | `lowlatency` | Native | 60 | H.264 | 8 Mbps | Ultra low latency |
 | `recording` | Native | 60 | HEVC | 50 Mbps | Local recording |
+| `hdr10_4k` | 4K | 60 | HEVC | 35 Mbps | HDR10 (10-bit P010) |
+| `hdr10_1440p` | 1440p | 60 | HEVC | 20 Mbps | HDR10 (10-bit P010) |
 
 ## Architecture
 
@@ -307,13 +317,14 @@ GhostStream uses the freedesktop Portal API for secure screen capture:
 - [x] PipeWire virtual camera
 - [x] File recording (MKV, MP4, WebM)
 - [x] Auto backend selection
-- [ ] RTMP streaming output
-- [ ] SRT streaming output
-- [ ] Audio capture and encoding
-- [ ] HDR support (10-bit P010)
-- [ ] DMA-BUF zero-copy capture
-- [ ] Intel QSV encoding
-- [ ] AMD AMF encoding
+- [x] Intel QSV encoding
+- [x] AMD AMF encoding
+- [x] RTMP streaming output
+- [x] SRT streaming output
+- [x] Audio capture and encoding
+- [x] Audio/Video muxing support
+- [x] HDR support (10-bit P010)
+- [x] DMA-BUF zero-copy capture
 
 ## Contributing
 

@@ -3,15 +3,15 @@
 //! Creates a PipeWire video source node that appears as a camera
 //! in applications like Discord, OBS, and video conferencing tools.
 //!
-//! NOTE: Virtual cameras need raw video frames, not encoded packets.
-//! This implementation decodes packets back to raw frames for camera output.
-//! For optimal performance with Discord/OBS, consider using a direct
-//! capture-to-camera pipeline that bypasses encoding.
+//! Uses RawOutputSink trait since virtual cameras need raw video frames,
+//! not encoded packets. Use the capture -> camera pipeline directly
+//! for optimal performance (no encoding/decoding overhead).
 
 use crate::error::{Error, Result};
-use crate::types::Packet;
+use crate::processing::convert_colorspace;
+use crate::types::{CodecParams, Frame, FrameFormat, Packet, Resolution};
 
-use super::OutputSink;
+use super::{OutputSink, RawOutputSink};
 
 use pipewire as pw;
 use pw::spa::param::video::VideoFormat;
@@ -31,6 +31,7 @@ pub struct VirtualCamera {
     pipewire_thread: Option<std::thread::JoinHandle<()>>,
     width: u32,
     height: u32,
+    format: FrameFormat,
 }
 
 impl VirtualCamera {
@@ -45,6 +46,7 @@ impl VirtualCamera {
             pipewire_thread: None,
             width: 1920,
             height: 1080,
+            format: FrameFormat::Bgra,
         }
     }
 
@@ -52,6 +54,12 @@ impl VirtualCamera {
     pub fn with_resolution(mut self, width: u32, height: u32) -> Self {
         self.width = width;
         self.height = height;
+        self
+    }
+
+    /// Set the expected frame format
+    pub fn with_format(mut self, format: FrameFormat) -> Self {
+        self.format = format;
         self
     }
 
@@ -74,12 +82,96 @@ impl VirtualCamera {
     }
 }
 
+/// RawOutputSink implementation for proper raw frame handling
 #[async_trait::async_trait]
-impl OutputSink for VirtualCamera {
-    async fn init_with_codec(&mut self, _codec_params: Option<&crate::types::CodecParams>) -> Result<()> {
+impl RawOutputSink for VirtualCamera {
+    async fn init_raw(&mut self, resolution: Resolution, format: FrameFormat) -> Result<()> {
         if self.initialized {
             return Ok(());
         }
+
+        self.width = resolution.width;
+        self.height = resolution.height;
+        self.format = format;
+
+        self.active.store(true, Ordering::SeqCst);
+        let frame_tx = self.start_pipewire_camera()?;
+        self.frame_tx = Some(frame_tx);
+
+        tracing::info!(
+            "Virtual camera '{}' initialized ({}x{}, {:?})",
+            self.name,
+            self.width,
+            self.height,
+            self.format
+        );
+        self.initialized = true;
+        Ok(())
+    }
+
+    async fn write_frame(&mut self, frame: &Frame) -> Result<()> {
+        if !self.initialized {
+            // Auto-initialize with frame properties
+            self.init_raw(
+                Resolution::new(frame.width, frame.height),
+                frame.format,
+            )
+            .await?;
+        }
+
+        if let Some(ref tx) = self.frame_tx {
+            // Convert to BGRA if needed (PipeWire expects BGRx/BGRA)
+            let frame_data = if frame.format == FrameFormat::Bgra {
+                frame.data.clone()
+            } else {
+                convert_colorspace(&frame.data, frame.format, FrameFormat::Bgra, frame.width, frame.height)?
+            };
+
+            // Send frame data to PipeWire thread
+            let _ = tx.send(frame_data);
+        }
+
+        self.bytes_written
+            .fetch_add(frame.data.len() as u64, Ordering::Relaxed);
+        Ok(())
+    }
+
+    async fn finish(&mut self) -> Result<()> {
+        if !self.initialized {
+            return Ok(());
+        }
+
+        self.active.store(false, Ordering::SeqCst);
+        drop(self.frame_tx.take());
+
+        if let Some(handle) = self.pipewire_thread.take() {
+            let _ = handle.join();
+        }
+
+        tracing::info!("Virtual camera '{}' stopped", self.name);
+        self.initialized = false;
+        Ok(())
+    }
+
+    fn bytes_written(&self) -> u64 {
+        self.bytes_written.load(Ordering::Relaxed)
+    }
+}
+
+/// OutputSink implementation for backward compatibility
+///
+/// NOTE: Prefer using RawOutputSink with write_frame() for virtual cameras.
+/// This implementation assumes packet.data contains raw frame bytes.
+#[async_trait::async_trait]
+impl OutputSink for VirtualCamera {
+    async fn init_with_codec(&mut self, _codec_params: Option<&CodecParams>) -> Result<()> {
+        if self.initialized {
+            return Ok(());
+        }
+
+        tracing::warn!(
+            "Virtual camera initialized via OutputSink - for best results, use RawOutputSink"
+        );
 
         self.active.store(true, Ordering::SeqCst);
         let frame_tx = self.start_pipewire_camera()?;
@@ -100,18 +192,8 @@ impl OutputSink for VirtualCamera {
             self.init().await?;
         }
 
-        // For virtual camera with encoded input, we would need to decode
-        // For now, just pass the data through (works if packet contains raw frames)
-        //
-        // TODO: Integrate with FFmpeg decoder for proper encoded->raw conversion
-        // OR: Create a separate RawOutput type that takes Frame instead of Packet
-        //
-        // For Discord usage, the pipeline should be:
-        // Capture -> [optional scale/convert] -> VirtualCamera (raw frames)
-        // NOT: Capture -> Encode -> VirtualCamera (needs decode)
-
+        // Pass through raw data - caller must ensure packet.data is raw frame bytes
         if let Some(ref tx) = self.frame_tx {
-            // Send raw frame data to PipeWire thread
             let _ = tx.send(packet.data.clone());
         }
 
@@ -121,20 +203,7 @@ impl OutputSink for VirtualCamera {
     }
 
     async fn finish(&mut self) -> Result<()> {
-        if !self.initialized {
-            return Ok(());
-        }
-
-        self.active.store(false, Ordering::SeqCst);
-        drop(self.frame_tx.take());
-
-        if let Some(handle) = self.pipewire_thread.take() {
-            let _ = handle.join();
-        }
-
-        tracing::info!("Virtual camera '{}' stopped", self.name);
-        self.initialized = false;
-        Ok(())
+        RawOutputSink::finish(self).await
     }
 
     fn bytes_written(&self) -> u64 {

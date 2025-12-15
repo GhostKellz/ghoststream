@@ -4,12 +4,17 @@
 //! - Resolution scaling
 //! - Colorspace conversion
 //! - HDR to SDR tonemapping
+//! - P010 (10-bit) format support
 
 mod convert;
+pub mod hdr;
 mod scale;
 
-pub use convert::ColorspaceConverter;
-pub use scale::Scaler;
+pub use convert::{convert_colorspace, ColorspaceConverter};
+pub use hdr::{
+    ColorMatrix, ColorPrimaries, ContentLightLevel, Hdr10Metadata, HdrConfig, TransferFunction,
+};
+pub use scale::{scale_frame, scale_nv12, ScaleAlgorithm, Scaler};
 
 use crate::error::Result;
 use crate::types::{Frame, FrameFormat, Resolution};

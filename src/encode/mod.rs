@@ -1,16 +1,20 @@
 //! Video encoding module
 //!
-//! Provides hardware-accelerated encoding via NVENC and software encoding
+//! Provides hardware-accelerated encoding via NVENC, QSV, AMF and software encoding
 //! via x264/x265/SVT-AV1 through FFmpeg.
 
+pub mod amf;
 pub mod nvenc;
+pub mod qsv;
 pub mod software;
 
 use crate::config::EncoderConfig;
 use crate::error::Result;
 use crate::types::{CodecParams, Frame, Packet};
 
+pub use amf::AmfEncoder;
 pub use nvenc::NvencEncoder;
+pub use qsv::QsvEncoder;
 pub use software::{CpuPreset, SoftwareEncoder};
 
 /// Supported video codecs
@@ -84,11 +88,15 @@ pub trait Encoder {
 /// Encoder backend selection
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum EncoderBackend {
-    /// Automatically select best available (NVENC > Software)
+    /// Automatically select best available (NVENC > QSV > AMF > Software)
     #[default]
     Auto,
     /// Force NVIDIA NVENC hardware encoding
     Nvenc,
+    /// Force Intel Quick Sync Video encoding
+    Qsv,
+    /// Force AMD AMF hardware encoding
+    Amf,
     /// Force CPU software encoding (x264/x265/SVT-AV1)
     Software,
 }
@@ -105,13 +113,21 @@ pub fn create_encoder_with_backend(
 ) -> Result<Box<dyn Encoder>> {
     match backend {
         EncoderBackend::Auto => {
-            // Try NVENC first, fall back to software
+            // Try hardware encoders in order: NVENC > QSV > AMF, fall back to software
             if nvenc::is_available() && nvenc::supports_codec(config.codec) {
                 tracing::info!("Using NVENC hardware encoder");
                 let encoder = NvencEncoder::new(config)?;
                 Ok(Box::new(encoder))
+            } else if qsv::is_available() && qsv::supports_codec(config.codec) {
+                tracing::info!("Using Intel QSV hardware encoder");
+                let encoder = QsvEncoder::new(config)?;
+                Ok(Box::new(encoder))
+            } else if amf::is_available() && amf::supports_codec(config.codec) {
+                tracing::info!("Using AMD AMF hardware encoder");
+                let encoder = AmfEncoder::new(config)?;
+                Ok(Box::new(encoder))
             } else if software::is_available(config.codec) {
-                tracing::info!("NVENC not available, using software encoder");
+                tracing::info!("No hardware encoder available, using software encoder");
                 let encoder = SoftwareEncoder::new(config)?;
                 Ok(Box::new(encoder))
             } else {
@@ -123,6 +139,14 @@ pub fn create_encoder_with_backend(
         }
         EncoderBackend::Nvenc => {
             let encoder = NvencEncoder::new(config)?;
+            Ok(Box::new(encoder))
+        }
+        EncoderBackend::Qsv => {
+            let encoder = QsvEncoder::new(config)?;
+            Ok(Box::new(encoder))
+        }
+        EncoderBackend::Amf => {
+            let encoder = AmfEncoder::new(config)?;
             Ok(Box::new(encoder))
         }
         EncoderBackend::Software => {
@@ -162,10 +186,44 @@ pub struct EncoderInfo {
     pub nvenc_av1: bool,
     /// Supports dual encoder?
     pub dual_encoder: bool,
+    /// Intel QSV info
+    pub qsv: QsvEncoderInfo,
+    /// AMD AMF info
+    pub amf: AmfEncoderInfo,
     /// Software encoder info
     pub software: SoftwareEncoderInfo,
     /// CPU info
     pub cpu: Option<software::CpuInfo>,
+}
+
+/// Intel QSV encoder availability
+#[derive(Debug, Clone, Default)]
+pub struct QsvEncoderInfo {
+    /// Is QSV available?
+    pub available: bool,
+    /// H.264 support
+    pub h264: bool,
+    /// HEVC support
+    pub hevc: bool,
+    /// AV1 support
+    pub av1: bool,
+    /// GPU info
+    pub gpu_info: Option<String>,
+}
+
+/// AMD AMF encoder availability
+#[derive(Debug, Clone, Default)]
+pub struct AmfEncoderInfo {
+    /// Is AMF available?
+    pub available: bool,
+    /// H.264 support
+    pub h264: bool,
+    /// HEVC support
+    pub hevc: bool,
+    /// AV1 support
+    pub av1: bool,
+    /// GPU info
+    pub gpu_info: Option<String>,
 }
 
 /// Software encoder availability
@@ -196,6 +254,26 @@ pub fn get_info() -> EncoderInfo {
         }
     }
 
+    // Intel QSV info
+    let qsv_caps = qsv::get_capabilities();
+    let qsv_info = QsvEncoderInfo {
+        available: qsv_caps.available,
+        h264: qsv_caps.h264,
+        hevc: qsv_caps.hevc,
+        av1: qsv_caps.av1,
+        gpu_info: qsv_caps.gpu_info,
+    };
+
+    // AMD AMF info
+    let amf_caps = amf::get_capabilities();
+    let amf_info = AmfEncoderInfo {
+        available: amf_caps.available,
+        h264: amf_caps.h264,
+        hevc: amf_caps.hevc,
+        av1: amf_caps.av1,
+        gpu_info: amf_caps.gpu_info,
+    };
+
     let software = SoftwareEncoderInfo {
         x264: software::has_x264(),
         x265: software::has_x265(),
@@ -211,6 +289,8 @@ pub fn get_info() -> EncoderInfo {
         driver_version: nvenc::get_driver_version(),
         nvenc_av1: nvenc::supports_codec(Codec::Av1),
         dual_encoder: nvenc::has_dual_encoder(),
+        qsv: qsv_info,
+        amf: amf_info,
         software,
         cpu,
     }

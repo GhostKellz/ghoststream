@@ -2,11 +2,11 @@
 name = "ghoststream"
 version = "0.1.0"
 edition = "2021"
-description = "NVIDIA GPU Video Engine - Capture, Encode, Stream"
+description = "Multi-Platform GPU Video Engine - Capture, Encode, Stream"
 authors = ["Christopher 'GhostKellz' Kelley"]
-license = "MIT OR Apache-2.0"
+license = "MIT"
 repository = "https://github.com/ghostkellz/ghoststream"
-keywords = ["nvenc", "video", "encoding", "streaming", "nvidia"]
+keywords = ["nvenc", "qsv", "amf", "video", "encoding", "streaming"]
 categories = ["multimedia::video", "hardware-support"]
 
 [lib]

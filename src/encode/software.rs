@@ -7,7 +7,7 @@
 
 use crate::config::EncoderConfig;
 use crate::error::{Error, Result};
-use crate::types::{CodecParams, Frame, FrameFormat, Framerate, Packet, Resolution};
+use crate::types::{CodecParams, Frame, FrameFormat, Packet, Resolution};
 
 use super::{Codec, Encoder, EncoderStats};
 
@@ -210,8 +210,11 @@ impl SoftwareEncoder {
         encoder.set_time_base(ffmpeg::Rational::new(1, 1000));
         self.time_base = ffmpeg::Rational::new(1, 1000);
 
-        // Set framerate
-        encoder.set_frame_rate(Some(ffmpeg::Rational::new(60, 1)));
+        // Set framerate from config
+        encoder.set_frame_rate(Some(ffmpeg::Rational::new(
+            self.config.framerate.num as i32,
+            self.config.framerate.den as i32,
+        )));
 
         // Set GOP size
         encoder.set_gop(self.config.gop_size);
@@ -556,7 +559,7 @@ impl Encoder for SoftwareEncoder {
             codec: self.config.codec,
             extradata,
             resolution,
-            framerate: Framerate::FPS_60,
+            framerate: self.config.framerate,
             time_base_num: self.time_base.numerator(),
             time_base_den: self.time_base.denominator(),
             bitrate: (self.config.bitrate_kbps as i64) * 1000,

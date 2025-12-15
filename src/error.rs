@@ -71,6 +71,42 @@ pub enum Error {
     #[error("FFmpeg error: {0}")]
     FFmpeg(String),
 
+    #[error("FFmpeg error: {0}")]
+    Ffmpeg(String),
+
+    // Audio errors
+    #[error("Audio capture error: {0}")]
+    AudioCapture(String),
+
+    #[error("Audio encoder error: {0}")]
+    AudioEncoder(String),
+
+    #[error("Capture not started")]
+    CaptureNotStarted,
+
+    #[error("Capture ended")]
+    CaptureEnded,
+
+    #[error("Encoder not initialized")]
+    EncoderNotInitialized,
+
+    #[error("Timeout: {0}")]
+    Timeout(String),
+
+    // Streaming errors
+    #[error("RTMP error: {0}")]
+    Rtmp(String),
+
+    #[error("SRT error: {0}")]
+    Srt(String),
+
+    #[error("Connection failed: {0}")]
+    ConnectionFailed(String),
+
+    // Muxer errors
+    #[error("Muxer error: {0}")]
+    Muxer(String),
+
     // General errors
     #[error("Configuration error: {0}")]
     Config(String),

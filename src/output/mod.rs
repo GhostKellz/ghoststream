@@ -4,15 +4,22 @@
 //! - Virtual camera (PipeWire)
 //! - File recording (MKV, MP4, WebM)
 //! - Streaming (RTMP, SRT)
+//! - A/V Muxing
 
 mod camera;
 mod file;
+mod muxer;
+mod rtmp;
+mod srt;
 
 pub use camera::VirtualCamera;
 pub use file::FileOutput;
+pub use muxer::{AvMuxer, MuxerPacket, StreamType};
+pub use rtmp::{RtmpOutput, RtmpService};
+pub use srt::{SrtMode, SrtOutput, SrtStats};
 
 use crate::error::Result;
-use crate::types::{CodecParams, Packet};
+use crate::types::{CodecParams, Frame, FrameFormat, Packet, Resolution};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -80,6 +87,22 @@ impl Output {
             latency_ms,
         }
     }
+
+    /// Create a multi-output (record + stream, etc.)
+    pub fn multiple(outputs: Vec<Output>) -> Self {
+        Output::Multiple(outputs)
+    }
+
+    /// Combine two outputs
+    pub fn and(self, other: Output) -> Self {
+        match self {
+            Output::Multiple(mut outputs) => {
+                outputs.push(other);
+                Output::Multiple(outputs)
+            }
+            _ => Output::Multiple(vec![self, other]),
+        }
+    }
 }
 
 impl Default for Output {
@@ -126,7 +149,7 @@ impl Container {
     }
 }
 
-/// Trait for output sinks
+/// Trait for output sinks (encoded packets)
 #[async_trait::async_trait]
 pub trait OutputSink: Send {
     /// Initialize the output with optional codec parameters
@@ -147,6 +170,27 @@ pub trait OutputSink: Send {
     fn bytes_written(&self) -> u64;
 }
 
+/// Trait for raw frame output sinks (uncompressed frames)
+///
+/// Use this for outputs that need raw video frames instead of encoded packets:
+/// - Virtual cameras (PipeWire)
+/// - Frame grabbers
+/// - Preview displays
+#[async_trait::async_trait]
+pub trait RawOutputSink: Send {
+    /// Initialize with frame format and resolution
+    async fn init_raw(&mut self, resolution: Resolution, format: FrameFormat) -> Result<()>;
+
+    /// Write a raw frame
+    async fn write_frame(&mut self, frame: &Frame) -> Result<()>;
+
+    /// Flush and finalize
+    async fn finish(&mut self) -> Result<()>;
+
+    /// Get bytes written
+    fn bytes_written(&self) -> u64;
+}
+
 /// Create an output sink from configuration
 pub async fn create_output(output: Output) -> Result<Box<dyn OutputSink>> {
     match output {
@@ -158,22 +202,111 @@ pub async fn create_output(output: Output) -> Result<Box<dyn OutputSink>> {
             let file = FileOutput::new(path, container);
             Ok(Box::new(file))
         }
-        Output::Rtmp { url: _ } => {
-            // TODO: Implement RTMP output
-            todo!("RTMP output not yet implemented")
+        Output::Rtmp { url } => {
+            let rtmp = RtmpOutput::new(url);
+            Ok(Box::new(rtmp))
         }
-        Output::Srt {
-            url: _,
-            latency_ms: _,
-        } => {
-            // TODO: Implement SRT output
-            todo!("SRT output not yet implemented")
+        Output::Srt { url, latency_ms } => {
+            let srt = SrtOutput::new(url, latency_ms);
+            Ok(Box::new(srt))
         }
-        Output::Multiple(_outputs) => {
-            // TODO: Implement multi-output
-            todo!("Multi-output not yet implemented")
+        Output::Multiple(outputs) => {
+            let multi = MultiOutput::new(outputs).await?;
+            Ok(Box::new(multi))
         }
         Output::Null => Ok(Box::new(NullOutput::default())),
+    }
+}
+
+/// Multi-output that writes to multiple destinations simultaneously
+pub struct MultiOutput {
+    outputs: Vec<Box<dyn OutputSink>>,
+}
+
+impl MultiOutput {
+    /// Create a multi-output from a list of output configs
+    pub async fn new(configs: Vec<Output>) -> Result<Self> {
+        let mut outputs = Vec::with_capacity(configs.len());
+
+        for config in configs {
+            // Create each output directly to avoid async recursion
+            let output: Box<dyn OutputSink> = match config {
+                Output::VirtualCamera { name } => Box::new(VirtualCamera::new(name)),
+                Output::File { path, container } => Box::new(FileOutput::new(path, container)),
+                Output::Rtmp { url } => Box::new(RtmpOutput::new(url)),
+                Output::Srt { url, latency_ms } => Box::new(SrtOutput::new(url, latency_ms)),
+                Output::Multiple(_) => {
+                    tracing::warn!("Nested multi-output not supported, skipping");
+                    continue;
+                }
+                Output::Null => Box::new(NullOutput::default()),
+            };
+            outputs.push(output);
+        }
+
+        if outputs.is_empty() {
+            return Err(crate::error::Error::OutputInit(
+                "No valid outputs in multi-output".into(),
+            ));
+        }
+
+        tracing::info!("Multi-output created with {} destinations", outputs.len());
+        Ok(Self { outputs })
+    }
+}
+
+#[async_trait::async_trait]
+impl OutputSink for MultiOutput {
+    async fn init_with_codec(&mut self, codec_params: Option<&CodecParams>) -> Result<()> {
+        let mut errors = Vec::new();
+
+        for (i, output) in self.outputs.iter_mut().enumerate() {
+            if let Err(e) = output.init_with_codec(codec_params).await {
+                tracing::error!("Failed to init output {}: {}", i, e);
+                errors.push(e);
+            }
+        }
+
+        // Return first error if all failed
+        if errors.len() == self.outputs.len() && !errors.is_empty() {
+            return Err(errors.remove(0));
+        }
+
+        Ok(())
+    }
+
+    async fn write(&mut self, packet: &Packet) -> Result<()> {
+        // Write to all outputs, continuing even if some fail
+        for (i, output) in self.outputs.iter_mut().enumerate() {
+            if let Err(e) = output.write(packet).await {
+                tracing::error!("Output {} write error: {}", i, e);
+                // Continue writing to other outputs
+            }
+        }
+        Ok(())
+    }
+
+    async fn finish(&mut self) -> Result<()> {
+        let mut errors = Vec::new();
+
+        for (i, output) in self.outputs.iter_mut().enumerate() {
+            if let Err(e) = output.finish().await {
+                tracing::error!("Failed to finish output {}: {}", i, e);
+                errors.push(e);
+            }
+        }
+
+        // Return first error if any
+        if let Some(e) = errors.into_iter().next() {
+            return Err(e);
+        }
+
+        Ok(())
+    }
+
+    fn bytes_written(&self) -> u64 {
+        // Return max bytes across all outputs (they should all be roughly the same)
+        self.outputs.iter().map(|o| o.bytes_written()).max().unwrap_or(0)
     }
 }
 

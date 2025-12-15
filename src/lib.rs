@@ -28,6 +28,7 @@
 //! }
 //! ```
 
+pub mod audio;
 pub mod capture;
 pub mod config;
 pub mod encode;
@@ -41,8 +42,9 @@ pub mod types;
 pub use config::{CaptureConfig, EncoderConfig, Preset};
 pub use encode::Codec;
 pub use error::{Error, Result};
-pub use output::Output;
-pub use pipeline::{Pipeline, PipelineBuilder};
+pub use output::{AvMuxer, Container, MuxerPacket, Output, StreamType};
+pub use pipeline::{AudioConfig, Pipeline, PipelineBuilder};
+pub use processing::{HdrConfig, Hdr10Metadata, ContentLightLevel, TransferFunction, ColorPrimaries};
 pub use types::{Frame, FrameFormat, Resolution};
 
 /// Library version

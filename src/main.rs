@@ -13,11 +13,15 @@ use ghoststream::{
 /// Encoder backend for CLI
 #[derive(Debug, Clone, Copy, ValueEnum, Default)]
 enum Backend {
-    /// Auto-select best available (NVENC > Software)
+    /// Auto-select best available (NVENC > QSV > AMF > Software)
     #[default]
     Auto,
     /// Force NVIDIA NVENC hardware encoding
     Nvenc,
+    /// Force Intel Quick Sync Video encoding
+    Qsv,
+    /// Force AMD AMF hardware encoding
+    Amf,
     /// Force CPU software encoding (x264/x265/SVT-AV1)
     Cpu,
 }
@@ -27,6 +31,8 @@ impl From<Backend> for EncoderBackend {
         match b {
             Backend::Auto => EncoderBackend::Auto,
             Backend::Nvenc => EncoderBackend::Nvenc,
+            Backend::Qsv => EncoderBackend::Qsv,
+            Backend::Amf => EncoderBackend::Amf,
             Backend::Cpu => EncoderBackend::Software,
         }
     }
@@ -153,6 +159,56 @@ fn cmd_info() -> anyhow::Result<()> {
         println!(
             "Dual Encoder: {}",
             if info.dual_encoder { "Yes" } else { "No" }
+        );
+    }
+
+    // Intel QSV Info
+    println!("\n=== Intel QSV ===");
+    println!(
+        "Available: {}",
+        if info.qsv.available { "Yes" } else { "No" }
+    );
+    if info.qsv.available {
+        if let Some(gpu) = &info.qsv.gpu_info {
+            println!("GPU: {}", gpu);
+        }
+        println!("Codecs:");
+        println!(
+            "  - H.264: {}",
+            if info.qsv.h264 { "Yes" } else { "No" }
+        );
+        println!(
+            "  - H.265: {}",
+            if info.qsv.hevc { "Yes" } else { "No" }
+        );
+        println!(
+            "  - AV1: {}",
+            if info.qsv.av1 { "Yes" } else { "No" }
+        );
+    }
+
+    // AMD AMF Info
+    println!("\n=== AMD AMF ===");
+    println!(
+        "Available: {}",
+        if info.amf.available { "Yes" } else { "No" }
+    );
+    if info.amf.available {
+        if let Some(gpu) = &info.amf.gpu_info {
+            println!("GPU: {}", gpu);
+        }
+        println!("Codecs:");
+        println!(
+            "  - H.264: {}",
+            if info.amf.h264 { "Yes" } else { "No" }
+        );
+        println!(
+            "  - H.265: {}",
+            if info.amf.hevc { "Yes" } else { "No" }
+        );
+        println!(
+            "  - AV1: {}",
+            if info.amf.av1 { "Yes" } else { "No" }
         );
     }
 
@@ -324,6 +380,8 @@ async fn cmd_bench(codec: String, frames: u32, backend: Backend) -> anyhow::Resu
     let backend_name = match encoder_backend {
         EncoderBackend::Auto => "Auto",
         EncoderBackend::Nvenc => "NVENC",
+        EncoderBackend::Qsv => "Intel QSV",
+        EncoderBackend::Amf => "AMD AMF",
         EncoderBackend::Software => "Software (CPU)",
     };
 
