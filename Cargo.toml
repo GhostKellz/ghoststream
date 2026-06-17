@@ -38,7 +38,7 @@ image = "0.25"
 ndarray = "0.16"
 
 # System directories
-dirs = "5.0"
+dirs = "6.0"
 
 # PipeWire for video streams
 pipewire = "0.9"
