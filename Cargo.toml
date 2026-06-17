@@ -24,7 +24,7 @@ async-trait = "0.1"
 futures = "0.3"
 
 # Screen capture via portal
-ashpd = { version = "0.10", features = ["tokio"] }
+ashpd = { version = "0.13", features = ["tokio"] }
 
 # V4L2 webcam capture
 v4l = "0.14"
