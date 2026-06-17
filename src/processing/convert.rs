@@ -16,7 +16,11 @@ fn format_to_pixel(format: FrameFormat) -> Option<Pixel> {
         FrameFormat::P010 => Some(Pixel::P010LE),
         FrameFormat::Yuv420p => Some(Pixel::YUV420P),
         FrameFormat::Yuv444p => Some(Pixel::YUV444P),
-        FrameFormat::Rgb24 => Some(Pixel::RGB24),
+        FrameFormat::Rgb | FrameFormat::Rgb24 => Some(Pixel::RGB24),
+        FrameFormat::Bgr => Some(Pixel::BGR24),
+        FrameFormat::Yuyv => Some(Pixel::YUYV422),
+        FrameFormat::Uyvy => Some(Pixel::UYVY422),
+        FrameFormat::Mjpeg => Some(Pixel::YUVJ420P), // Decoded MJPEG is typically YUV420
     }
 }
 

@@ -257,14 +257,14 @@ fn run_dmabuf_capture(
     // Initialize PipeWire
     pw::init();
 
-    let mainloop = pw::main_loop::MainLoop::new(None)
+    let mainloop = pw::main_loop::MainLoopRc::new(None)
         .map_err(|e| Error::PipeWire(format!("Failed to create mainloop: {}", e)))?;
 
-    let context = pw::context::Context::new(&mainloop)
+    let context = pw::context::ContextRc::new(&mainloop, None)
         .map_err(|e| Error::PipeWire(format!("Failed to create context: {}", e)))?;
 
     let core = context
-        .connect(None)
+        .connect_rc(None)
         .map_err(|e| Error::PipeWire(format!("Failed to connect: {}", e)))?;
 
     // Create stream properties requesting DMA-BUF
@@ -275,7 +275,7 @@ fn run_dmabuf_capture(
     };
 
     // Create stream
-    let stream = pw::stream::Stream::new(&core, "ghoststream-dmabuf", props)
+    let stream = pw::stream::StreamRc::new(core, "ghoststream-dmabuf", props)
         .map_err(|e| Error::PipeWire(format!("Failed to create stream: {}", e)))?;
 
     // Set up stream listener for DMA-BUF buffers

@@ -1,6 +1,6 @@
 # Rust build artifacts
 target/
-Cargo.lock
+tasks/
 
 # IDE
 .idea/
@@ -12,11 +12,6 @@ Cargo.lock
 # OS
 .DS_Store
 Thumbs.db
-
-# Development docs (generated)
-CLAUDE.md
-TODO.md
-DEVELOPMENT_ROADMAP.md
 
 # Environment
 .env
@@ -36,5 +31,4 @@ flamegraph.svg
 *.hevc
 *.av1
 
-archive/ 
 archive/

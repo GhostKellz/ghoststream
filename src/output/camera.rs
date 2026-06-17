@@ -18,8 +18,8 @@ use pw::spa::param::video::VideoFormat;
 use pw::spa::pod::Pod;
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
 use std::sync::mpsc;
+use std::sync::Arc;
 
 /// Virtual camera output
 pub struct VirtualCamera {
@@ -72,8 +72,29 @@ impl VirtualCamera {
         let height = self.height;
 
         let handle = std::thread::spawn(move || {
-            if let Err(e) = run_virtual_camera(name, width, height, frame_rx, active) {
-                tracing::error!("Virtual camera error: {}", e);
+            // Catch panics to prevent silent thread death
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                run_virtual_camera(name.clone(), width, height, frame_rx, active)
+            }));
+
+            match result {
+                Ok(Ok(())) => {
+                    tracing::debug!("Virtual camera '{}' thread exited cleanly", name);
+                }
+                Ok(Err(e)) => {
+                    tracing::error!("Virtual camera '{}' error: {}", name, e);
+                }
+                Err(panic_info) => {
+                    // Extract panic message if possible
+                    let panic_msg = if let Some(s) = panic_info.downcast_ref::<&str>() {
+                        s.to_string()
+                    } else if let Some(s) = panic_info.downcast_ref::<String>() {
+                        s.clone()
+                    } else {
+                        "unknown panic".to_string()
+                    };
+                    tracing::error!("Virtual camera '{}' thread panicked: {}", name, panic_msg);
+                }
             }
         });
 
@@ -112,11 +133,8 @@ impl RawOutputSink for VirtualCamera {
     async fn write_frame(&mut self, frame: &Frame) -> Result<()> {
         if !self.initialized {
             // Auto-initialize with frame properties
-            self.init_raw(
-                Resolution::new(frame.width, frame.height),
-                frame.format,
-            )
-            .await?;
+            self.init_raw(Resolution::new(frame.width, frame.height), frame.format)
+                .await?;
         }
 
         if let Some(ref tx) = self.frame_tx {
@@ -124,7 +142,13 @@ impl RawOutputSink for VirtualCamera {
             let frame_data = if frame.format == FrameFormat::Bgra {
                 frame.data.clone()
             } else {
-                convert_colorspace(&frame.data, frame.format, FrameFormat::Bgra, frame.width, frame.height)?
+                convert_colorspace(
+                    &frame.data,
+                    frame.format,
+                    FrameFormat::Bgra,
+                    frame.width,
+                    frame.height,
+                )?
             };
 
             // Send frame data to PipeWire thread
@@ -145,7 +169,12 @@ impl RawOutputSink for VirtualCamera {
         drop(self.frame_tx.take());
 
         if let Some(handle) = self.pipewire_thread.take() {
-            let _ = handle.join();
+            match handle.join() {
+                Ok(()) => {}
+                Err(_) => {
+                    tracing::warn!("Virtual camera thread panicked during finish");
+                }
+            }
         }
 
         tracing::info!("Virtual camera '{}' stopped", self.name);
@@ -216,7 +245,15 @@ impl Drop for VirtualCamera {
         self.active.store(false, Ordering::SeqCst);
         drop(self.frame_tx.take());
         if let Some(handle) = self.pipewire_thread.take() {
-            let _ = handle.join();
+            match handle.join() {
+                Ok(()) => {}
+                Err(_) => {
+                    tracing::warn!(
+                        "Virtual camera '{}' thread panicked during shutdown",
+                        self.name
+                    );
+                }
+            }
         }
     }
 }
@@ -243,19 +280,19 @@ fn run_virtual_camera(
     // Initialize PipeWire
     pw::init();
 
-    let mainloop = pw::main_loop::MainLoop::new(None)
+    let mainloop = pw::main_loop::MainLoopRc::new(None)
         .map_err(|e| Error::PipeWire(format!("Failed to create main loop: {:?}", e)))?;
 
-    let context = pw::context::Context::new(&mainloop)
+    let context = pw::context::ContextRc::new(&mainloop, None)
         .map_err(|e| Error::PipeWire(format!("Failed to create context: {:?}", e)))?;
 
     let core = context
-        .connect(None)
+        .connect_rc(None)
         .map_err(|e| Error::PipeWire(format!("Failed to connect to PipeWire: {:?}", e)))?;
 
     // Create stream as a video source (camera)
-    let stream = pw::stream::Stream::new(
-        &core,
+    let stream = pw::stream::StreamRc::new(
+        core,
         &name,
         pw::properties::properties! {
             *pw::keys::MEDIA_TYPE => "Video",
@@ -412,7 +449,9 @@ fn run_virtual_camera(
 
     // Run main loop
     while active_clone.load(Ordering::SeqCst) {
-        mainloop.loop_().iterate(std::time::Duration::from_millis(16));
+        mainloop
+            .loop_()
+            .iterate(std::time::Duration::from_millis(16));
     }
 
     tracing::info!("Virtual camera stopped");

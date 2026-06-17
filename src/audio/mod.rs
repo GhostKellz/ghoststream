@@ -3,9 +3,11 @@
 //! Provides:
 //! - PipeWire audio capture (desktop/application audio)
 //! - FFmpeg audio encoding (AAC, Opus)
+//! - GhostWave RTX audio processing (optional)
 
 mod capture;
 mod encode;
+pub mod ghostwave;
 mod types;
 
 pub use capture::{AudioCapture, AudioCaptureConfig, AudioSource, PipeWireAudioCapture};
@@ -14,6 +16,12 @@ pub use encode::{
     FfmpegAudioEncoder,
 };
 pub use types::{AudioFrame, AudioPacket, AudioParams, ChannelLayout, SampleFormat};
+
+// GhostWave RTX audio processing
+pub use ghostwave::{
+    GhostWaveConfig, GhostWaveProcessor, ProcessingMode, ProcessingProfile,
+    ProcessingStats, SharedGhostWaveProcessor,
+};
 
 use crate::error::Result;
 

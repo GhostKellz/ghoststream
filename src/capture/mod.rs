@@ -1,19 +1,22 @@
-//! Screen capture module
+//! Capture module
 //!
-//! Provides screen capture via:
-//! - xdg-desktop-portal (recommended for Wayland)
-//! - PipeWire direct capture
-//! - DMA-BUF zero-copy (wlroots, KDE, GNOME)
+//! Provides capture from multiple sources:
+//! - Screen: xdg-desktop-portal (recommended for Wayland)
+//! - Screen: PipeWire direct capture
+//! - Screen: DMA-BUF zero-copy (wlroots, KDE, GNOME)
+//! - Webcam: V4L2 (USB cameras like Elgato Facecam, Logitech)
 
 mod dmabuf;
 mod portal;
 mod stream;
+mod webcam;
 
 pub use dmabuf::{DmaBufCapture, DmaBufFrame, DmaBufInfo, DmaBufImporter};
 pub use portal::PortalCapture;
 pub use stream::CaptureStream;
+pub use webcam::{WebcamCapture, WebcamDeviceInfo};
 
-use crate::config::{CaptureBackend, CaptureConfig};
+use crate::config::{CaptureBackend, CaptureConfig, WebcamConfig};
 use crate::error::Result;
 use crate::types::Frame;
 
@@ -70,7 +73,24 @@ pub async fn create_capture(config: CaptureConfig) -> Result<Box<dyn Capture>> {
                 Ok(Box::new(capture))
             }
         }
+        CaptureBackend::Webcam => {
+            tracing::info!("Using V4L2 webcam capture");
+            let webcam_config = WebcamConfig::default()
+                .with_fps(config.framerate.num);
+            let capture = WebcamCapture::new(webcam_config)?;
+            Ok(Box::new(capture))
+        }
     }
+}
+
+/// Create a webcam capture with specific configuration
+pub fn create_webcam_capture(config: WebcamConfig) -> Result<WebcamCapture> {
+    WebcamCapture::new(config)
+}
+
+/// List available webcam devices
+pub fn list_webcams() -> Result<Vec<WebcamDeviceInfo>> {
+    WebcamCapture::list_devices()
 }
 
 /// Detect the best capture backend for this system

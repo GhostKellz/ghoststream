@@ -242,19 +242,19 @@ fn run_pipewire_capture(
     // Initialize PipeWire
     pw::init();
 
-    let mainloop = pw::main_loop::MainLoop::new(None)
+    let mainloop = pw::main_loop::MainLoopRc::new(None)
         .map_err(|e| Error::PipeWire(format!("Failed to create main loop: {:?}", e)))?;
 
-    let context = pw::context::Context::new(&mainloop)
+    let context = pw::context::ContextRc::new(&mainloop, None)
         .map_err(|e| Error::PipeWire(format!("Failed to create context: {:?}", e)))?;
 
     let core = context
-        .connect(None)
+        .connect_rc(None)
         .map_err(|e| Error::PipeWire(format!("Failed to connect to PipeWire: {:?}", e)))?;
 
     // Create stream with properties
-    let stream = pw::stream::Stream::new(
-        &core,
+    let stream = pw::stream::StreamRc::new(
+        core,
         "ghoststream-capture",
         pw::properties::properties! {
             *pw::keys::MEDIA_TYPE => "Video",
@@ -488,7 +488,9 @@ fn run_pipewire_capture(
     // Run main loop until stopped
     while active_clone.load(Ordering::SeqCst) {
         // Iterate with timeout to check active flag periodically
-        mainloop.loop_().iterate(std::time::Duration::from_millis(16)); // ~60fps check rate
+        mainloop
+            .loop_()
+            .iterate(std::time::Duration::from_millis(16)); // ~60fps check rate
     }
 
     tracing::info!("PipeWire capture loop ended");

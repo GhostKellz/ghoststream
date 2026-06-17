@@ -26,10 +26,24 @@ futures = "0.3"
 # Screen capture via portal
 ashpd = { version = "0.10", features = ["tokio"] }
 
+# V4L2 webcam capture
+v4l = "0.14"
+
+# ONNX Runtime for AI inference (background removal, etc.)
+# Using rc.9 which has better compatibility
+ort = { version = "2.0.0-rc.9", default-features = false, features = ["std", "load-dynamic", "api-24", "cuda", "tensorrt"] }
+
+# Image processing
+image = "0.25"
+ndarray = "0.16"
+
+# System directories
+dirs = "5.0"
+
 # PipeWire for video streams
-pipewire = "0.8"
-libspa = "0.8"
-libspa-sys = "0.8"
+pipewire = "0.9"
+libspa = "0.9"
+libspa-sys = "0.9"
 
 # Video encoding (FFmpeg with NVENC)
 ffmpeg-next = "8.0"

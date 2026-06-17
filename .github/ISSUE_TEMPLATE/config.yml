@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: GhostStream Documentation
+    url: https://github.com/GhostKellz/ghoststream/tree/main/docs
+    about: Check the documentation before filing an issue.

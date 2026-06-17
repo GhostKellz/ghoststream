@@ -5,11 +5,14 @@
 //! - Colorspace conversion
 //! - HDR to SDR tonemapping
 //! - P010 (10-bit) format support
+//! - AI-powered background removal/blur
 
+pub mod background;
 mod convert;
 pub mod hdr;
 mod scale;
 
+pub use background::{BackgroundConfig, BackgroundMode, BackgroundProcessor, SegmentationModel};
 pub use convert::{convert_colorspace, ColorspaceConverter};
 pub use hdr::{
     ColorMatrix, ColorPrimaries, ContentLightLevel, Hdr10Metadata, HdrConfig, TransferFunction,

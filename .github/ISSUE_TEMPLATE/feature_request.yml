@@ -1,0 +1,33 @@
+name: Feature request
+description: Suggest a new backend, processing stage, output, or workflow improvement.
+title: "[feature] "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What problem are you trying to solve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the feature or workflow you want.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Hardware / software context
+      description: GPU, encoder, distro, compositor, PipeWire, FFmpeg, or integration context.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Existing APIs, tools, or workarounds you already tried.

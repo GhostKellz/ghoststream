@@ -2,8 +2,8 @@
 //!
 //! Captures audio from desktop (monitor) or application sources.
 
-use crate::error::{Error, Result};
 use super::types::{AudioFrame, ChannelLayout, SampleFormat};
+use crate::error::{Error, Result};
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -141,9 +141,7 @@ impl AudioCapture for PipeWireAudioCapture {
             Err(crossbeam_channel::RecvTimeoutError::Timeout) => {
                 Err(Error::Timeout("Audio frame timeout".into()))
             }
-            Err(crossbeam_channel::RecvTimeoutError::Disconnected) => {
-                Err(Error::CaptureEnded)
-            }
+            Err(crossbeam_channel::RecvTimeoutError::Disconnected) => Err(Error::CaptureEnded),
         }
     }
 
@@ -171,14 +169,14 @@ fn run_pipewire_capture(
     // Initialize PipeWire
     pw::init();
 
-    let mainloop = pw::main_loop::MainLoop::new(None)
+    let mainloop = pw::main_loop::MainLoopRc::new(None)
         .map_err(|e| Error::PipeWire(format!("Failed to create mainloop: {}", e)))?;
 
-    let context = pw::context::Context::new(&mainloop)
+    let context = pw::context::ContextRc::new(&mainloop, None)
         .map_err(|e| Error::PipeWire(format!("Failed to create context: {}", e)))?;
 
     let core = context
-        .connect(None)
+        .connect_rc(None)
         .map_err(|e| Error::PipeWire(format!("Failed to connect: {}", e)))?;
 
     // Create stream properties
@@ -190,7 +188,7 @@ fn run_pipewire_capture(
     };
 
     // Create stream
-    let stream = pw::stream::Stream::new(&core, "ghoststream-audio", props)
+    let stream = pw::stream::StreamRc::new(core, "ghoststream-audio", props)
         .map_err(|e| Error::PipeWire(format!("Failed to create stream: {}", e)))?;
 
     // Set up stream listener

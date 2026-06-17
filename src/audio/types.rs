@@ -142,6 +142,47 @@ impl AudioFrame {
     pub fn size_bytes(&self) -> usize {
         self.data.len()
     }
+
+    /// Convert to f32 slice (for processing)
+    ///
+    /// Returns borrowed slice if data is already F32 format,
+    /// otherwise converts and returns owned Vec as slice.
+    pub fn as_f32_slice(&self) -> crate::Result<std::borrow::Cow<'_, [f32]>> {
+        match self.format {
+            SampleFormat::F32 => {
+                // Safety: we know the data is f32 samples
+                let ptr = self.data.as_ptr() as *const f32;
+                let len = self.data.len() / 4;
+                Ok(std::borrow::Cow::Borrowed(unsafe {
+                    std::slice::from_raw_parts(ptr, len)
+                }))
+            }
+            SampleFormat::S16 => {
+                // Convert S16 to F32
+                let samples = self.data.len() / 2;
+                let mut f32_data = Vec::with_capacity(samples);
+                for chunk in self.data.chunks_exact(2) {
+                    let sample = i16::from_le_bytes([chunk[0], chunk[1]]);
+                    f32_data.push(sample as f32 / 32768.0);
+                }
+                Ok(std::borrow::Cow::Owned(f32_data))
+            }
+            SampleFormat::S32 => {
+                // Convert S32 to F32
+                let samples = self.data.len() / 4;
+                let mut f32_data = Vec::with_capacity(samples);
+                for chunk in self.data.chunks_exact(4) {
+                    let sample = i32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+                    f32_data.push(sample as f32 / 2147483648.0);
+                }
+                Ok(std::borrow::Cow::Owned(f32_data))
+            }
+            _ => Err(crate::Error::AudioProcessing(format!(
+                "Cannot convert {:?} to f32 slice",
+                self.format
+            ))),
+        }
+    }
 }
 
 /// Audio codec parameters for muxing

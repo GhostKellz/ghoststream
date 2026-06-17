@@ -1,0 +1,98 @@
+name: Bug report
+description: Report a capture, encoding, processing, output, or hardware-specific issue.
+title: "[bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please gather basic diagnostics before filing:
+
+        ```bash
+        ghoststream --version
+        uname -r
+        pw-cli info 0
+        ffmpeg -version
+        ```
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What is broken?
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Exact commands or API calls that reproduce the issue.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: GhostStream version or commit
+      placeholder: 0.1.0 / git commit
+    validations:
+      required: true
+
+  - type: input
+    id: distro
+    attributes:
+      label: Distribution
+      placeholder: Arch Linux / Fedora / Ubuntu
+    validations:
+      required: true
+
+  - type: input
+    id: compositor
+    attributes:
+      label: Desktop / compositor
+      placeholder: KDE Plasma / GNOME / Hyprland / Sway / Gamescope
+
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU and driver
+      placeholder: RTX 5090, NVIDIA 580.x / AMD / Intel
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - capture
+        - audio
+        - encoding
+        - processing
+        - virtual camera
+        - file output
+        - streaming output
+        - build/dependencies
+        - not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and diagnostics
+      description: Paste relevant logs, command output, or backtraces.

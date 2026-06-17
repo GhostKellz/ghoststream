@@ -61,6 +61,49 @@ pub enum CaptureBackend {
     PipeWire,
     /// Wlroots DMA-BUF export (for wlroots compositors)
     WlrExport,
+    /// V4L2 Webcam capture (for USB cameras like Elgato Facecam)
+    Webcam,
+}
+
+/// Webcam capture configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebcamConfig {
+    /// Device path (e.g., "/dev/video0") or None for auto-detect
+    pub device: Option<String>,
+    /// Target framerate
+    pub framerate: Framerate,
+    /// Target resolution (None = use device default)
+    pub resolution: Option<Resolution>,
+    /// Preferred pixel format
+    pub format: Option<FrameFormat>,
+}
+
+impl Default for WebcamConfig {
+    fn default() -> Self {
+        Self {
+            device: None,
+            framerate: Framerate::FPS_30,
+            resolution: None,
+            format: None,
+        }
+    }
+}
+
+impl WebcamConfig {
+    pub fn with_device(mut self, device: impl Into<String>) -> Self {
+        self.device = Some(device.into());
+        self
+    }
+
+    pub fn with_resolution(mut self, width: u32, height: u32) -> Self {
+        self.resolution = Some(Resolution::new(width, height));
+        self
+    }
+
+    pub fn with_fps(mut self, fps: u32) -> Self {
+        self.framerate = Framerate::new(fps, 1);
+        self
+    }
 }
 
 /// Encoder configuration

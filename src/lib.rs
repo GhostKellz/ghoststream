@@ -47,6 +47,13 @@ pub use pipeline::{AudioConfig, Pipeline, PipelineBuilder};
 pub use processing::{HdrConfig, Hdr10Metadata, ContentLightLevel, TransferFunction, ColorPrimaries};
 pub use types::{Frame, FrameFormat, Resolution};
 
+// GhostWave RTX audio processing
+pub use audio::ghostwave::{
+    GhostWaveConfig, GhostWaveProcessor, ProcessingMode as AudioProcessingMode,
+    ProcessingProfile as AudioProfile, ProcessingStats as AudioStats,
+    SharedGhostWaveProcessor,
+};
+
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 

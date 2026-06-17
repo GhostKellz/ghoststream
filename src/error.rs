@@ -9,6 +9,12 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Error, Debug)]
 pub enum Error {
     // Capture errors
+    #[error("Capture error: {0}")]
+    Capture(String),
+
+    #[error("Webcam error: {0}")]
+    Webcam(String),
+
     #[error("Portal error: {0}")]
     Portal(String),
 
@@ -80,6 +86,9 @@ pub enum Error {
 
     #[error("Audio encoder error: {0}")]
     AudioEncoder(String),
+
+    #[error("Audio processing error: {0}")]
+    AudioProcessing(String),
 
     #[error("Capture not started")]
     CaptureNotStarted,

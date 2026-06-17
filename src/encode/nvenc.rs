@@ -193,8 +193,12 @@ impl NvencEncoder {
             FrameFormat::Yuv444p => Pixel::YUV444P,
             FrameFormat::Bgra => Pixel::BGRA,
             FrameFormat::Rgba => Pixel::RGBA,
-            FrameFormat::Rgb24 => Pixel::RGB24,
+            FrameFormat::Rgb | FrameFormat::Rgb24 => Pixel::RGB24,
+            FrameFormat::Bgr => Pixel::BGR24,
             FrameFormat::P010 => Pixel::P010LE,
+            FrameFormat::Yuyv => Pixel::YUYV422,
+            FrameFormat::Uyvy => Pixel::UYVY422,
+            FrameFormat::Mjpeg => Pixel::YUVJ420P, // MJPEG typically decodes to YUV420
         }
     }
 }

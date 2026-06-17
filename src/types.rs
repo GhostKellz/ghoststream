@@ -58,10 +58,20 @@ pub enum FrameFormat {
     Bgra,
     /// RGBA - 32-bit RGBA
     Rgba,
-    /// RGB24 - 24-bit RGB
+    /// RGB - 24-bit RGB
+    Rgb,
+    /// BGR - 24-bit BGR
+    Bgr,
+    /// RGB24 - 24-bit RGB (alias for Rgb)
     Rgb24,
     /// P010 - 10-bit NV12 (HDR)
     P010,
+    /// YUYV - Packed YUV 4:2:2 (common webcam format)
+    Yuyv,
+    /// MJPEG - Motion JPEG (common webcam format)
+    Mjpeg,
+    /// UYVY - Packed YUV 4:2:2 (alternative packing)
+    Uyvy,
 }
 
 impl FrameFormat {
@@ -71,14 +81,21 @@ impl FrameFormat {
             FrameFormat::Nv12 | FrameFormat::Yuv420p => 1.5,
             FrameFormat::Yuv444p => 3.0,
             FrameFormat::Bgra | FrameFormat::Rgba => 4.0,
-            FrameFormat::Rgb24 => 3.0,
+            FrameFormat::Rgb | FrameFormat::Bgr | FrameFormat::Rgb24 => 3.0,
             FrameFormat::P010 => 3.0, // 10-bit = 1.5 * 2
+            FrameFormat::Yuyv | FrameFormat::Uyvy => 2.0, // 4:2:2 packed
+            FrameFormat::Mjpeg => 0.5, // Variable, but typically compressed
         }
     }
 
     /// Is this a hardware-friendly format for NVENC?
     pub fn is_nvenc_native(&self) -> bool {
         matches!(self, FrameFormat::Nv12 | FrameFormat::P010)
+    }
+
+    /// Is this a webcam-native format?
+    pub fn is_webcam_native(&self) -> bool {
+        matches!(self, FrameFormat::Yuyv | FrameFormat::Mjpeg | FrameFormat::Nv12)
     }
 }
 
