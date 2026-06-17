@@ -398,7 +398,9 @@ fn run_dmabuf_capture(
     let weak_mainloop = mainloop.downgrade();
     while running.load(Ordering::SeqCst) {
         if let Some(ml) = weak_mainloop.upgrade() {
-            ml.loop_().iterate(std::time::Duration::from_millis(10));
+            ml.loop_().iterate(pipewire::loop_::Timeout::Finite(
+                std::time::Duration::from_millis(10),
+            ));
         } else {
             break;
         }

@@ -46,7 +46,9 @@ impl PortalCapture {
 
     /// Request screen capture permission from user via portal
     async fn request_permission(&mut self) -> Result<u32> {
-        use ashpd::desktop::screencast::{CursorMode, Screencast, SourceType};
+        use ashpd::desktop::screencast::{
+            CursorMode, Screencast, SelectSourcesOptions, SourceType,
+        };
         use ashpd::desktop::PersistMode;
 
         tracing::info!("Requesting screen capture permission via portal");
@@ -57,27 +59,26 @@ impl PortalCapture {
 
         // Create session
         let session = proxy
-            .create_session()
+            .create_session(Default::default())
             .await
             .map_err(|e| Error::Portal(format!("Failed to create session: {}", e)))?;
 
         // Select sources - allow both monitors and windows
+        let options = SelectSourcesOptions::default()
+            .set_cursor_mode(CursorMode::Embedded)
+            .set_sources(SourceType::Monitor | SourceType::Window)
+            .set_multiple(false)
+            .set_persist_mode(PersistMode::DoNot);
+
         proxy
-            .select_sources(
-                &session,
-                CursorMode::Embedded, // Include cursor in capture
-                SourceType::Monitor | SourceType::Window,
-                false, // multiple selection
-                None,  // restore_token
-                PersistMode::DoNot,
-            )
+            .select_sources(&session, options)
             .await
             .map_err(|e| Error::Portal(format!("Failed to select sources: {}", e)))?;
 
         // Start the screencast - this shows the portal picker dialog
         // Pass None for window identifier (no parent window)
         let response = proxy
-            .start(&session, None)
+            .start(&session, None, Default::default())
             .await
             .map_err(|e| Error::Portal(format!("User cancelled or portal error: {}", e)))?;
 
@@ -490,7 +491,9 @@ fn run_pipewire_capture(
         // Iterate with timeout to check active flag periodically
         mainloop
             .loop_()
-            .iterate(std::time::Duration::from_millis(16)); // ~60fps check rate
+            .iterate(pipewire::loop_::Timeout::Finite(
+                std::time::Duration::from_millis(16),
+            )); // ~60fps check rate
     }
 
     tracing::info!("PipeWire capture loop ended");

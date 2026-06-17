@@ -1,9 +1,9 @@
 [package]
 name = "ghoststream"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "Multi-Platform GPU Video Engine - Capture, Encode, Stream"
-authors = ["Christopher 'GhostKellz' Kelley"]
+authors = ["Christopher Kelley <ckelley@ghostkellz.sh>"]
 license = "MIT"
 repository = "https://github.com/ghostkellz/ghoststream"
 keywords = ["nvenc", "qsv", "amf", "video", "encoding", "streaming"]
@@ -24,7 +24,7 @@ async-trait = "0.1"
 futures = "0.3"
 
 # Screen capture via portal
-ashpd = { version = "0.10", features = ["tokio"] }
+ashpd = { version = "0.13", features = ["screencast", "tokio"] }
 
 # V4L2 webcam capture
 v4l = "0.14"
@@ -34,16 +34,16 @@ v4l = "0.14"
 ort = { version = "2.0.0-rc.9", default-features = false, features = ["std", "load-dynamic", "api-24", "cuda", "tensorrt"] }
 
 # Image processing
-image = "0.25"
-ndarray = "0.16"
+image = { version = "0.25", default-features = false, features = ["bmp", "gif", "jpeg", "png", "tiff", "webp"] }
+ndarray = "0.17"
 
 # System directories
-dirs = "5.0"
+dirs = "6.0"
 
 # PipeWire for video streams
-pipewire = "0.9"
-libspa = "0.9"
-libspa-sys = "0.9"
+pipewire = "0.10"
+libspa = "0.10"
+libspa-sys = "0.10"
 
 # Video encoding (FFmpeg with NVENC)
 ffmpeg-next = "8.0"
@@ -58,7 +58,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
-toml = "0.8"
+toml = "1.1"
 
 # CLI
 clap = { version = "4.5", features = ["derive"] }
@@ -68,7 +68,7 @@ parking_lot = "0.12"
 crossbeam-channel = "0.5"
 
 [dev-dependencies]
-criterion = "0.5"
+criterion = "0.8"
 tempfile = "3.10"
 
 [features]

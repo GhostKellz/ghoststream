@@ -451,7 +451,9 @@ fn run_virtual_camera(
     while active_clone.load(Ordering::SeqCst) {
         mainloop
             .loop_()
-            .iterate(std::time::Duration::from_millis(16));
+            .iterate(pipewire::loop_::Timeout::Finite(
+                std::time::Duration::from_millis(16),
+            ));
     }
 
     tracing::info!("Virtual camera stopped");
