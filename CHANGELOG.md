@@ -16,8 +16,12 @@
 ### Changed
 
 - Updated Rust dependencies with `cargo update`.
-- Updated PipeWire and libspa dependencies to the `0.9` series.
-- Migrated PipeWire call sites to the current `pipewire` `0.9` API.
+- Migrated the crate to Rust 2024 edition.
+- Updated package author metadata to `Christopher Kelley <ckelley@ghostkellz.sh>`.
+- Updated PipeWire and libspa dependencies to the `0.10` series.
+- Migrated PipeWire call sites to the current `pipewire` `0.10` API.
+- Updated `ashpd`, `criterion`, `dirs`, `ndarray`, and `toml` to current Rust-compatible versions.
+- Migrated portal screencast setup to the current `ashpd` options API.
 - Configured `ort` for dynamic ONNX Runtime loading with the required `std`, `load-dynamic`, and `api-24` features plus CUDA and TensorRT support.
 - Cleaned `.gitignore` so `Cargo.lock` is no longer ignored and local task scratch stays out of commits.
 
@@ -28,10 +32,12 @@
 
 ### Security
 
-- Ran `cargo audit`; the only advisory currently accepted is `RUSTSEC-2024-0436` for transitive `paste` usage through `rav1e`/`ravif`/`image`.
+- Restricted `image` features to the formats Ghoststream uses, removing the transitive `ravif`/`rav1e`/`paste` advisory path.
+- Closed superseded Dependabot pull requests after folding their dependency updates into `main`.
+- Ran `cargo audit`; no vulnerabilities or accepted advisories remain.
 
 ### Verified
 
 - `cargo check` passes.
 - `cargo test` passes.
-- `cargo audit` passes with the documented accepted advisory.
+- `cargo audit` passes.
