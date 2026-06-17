@@ -68,7 +68,7 @@ parking_lot = "0.12"
 crossbeam-channel = "0.5"
 
 [dev-dependencies]
-criterion = "0.5"
+criterion = "0.8"
 tempfile = "3.10"
 
 [features]
